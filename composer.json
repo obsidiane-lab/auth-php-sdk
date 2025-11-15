@@ -1,0 +1,21 @@
+{
+    "name": "obsidiane/auth-php-sdk",
+    "description": "Symfony bundle fournissant un client Obsidiane Auth (cookies + CSRF stateless)",
+    "type": "symfony-bundle",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Obsidiane\\AuthBundle\\": "src/"
+        }
+    },
+    "require": {
+        "php": ">=8.2",
+        "symfony/framework-bundle": "^7.0 || ^6.4",
+        "symfony/http-client": "^7.0 || ^6.4"
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-main": "1.x-dev"
+        }
+    }
+}
