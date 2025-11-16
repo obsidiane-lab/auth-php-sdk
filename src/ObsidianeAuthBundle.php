@@ -4,11 +4,9 @@ namespace Obsidiane\AuthBundle;
 
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
-use Symfony\Component\DependencyInjection\Loader\Configurator\ParametersConfigurator;
-use Symfony\Component\DependencyInjection\Loader\Configurator\ServicesConfigurator;
-use Symfony\Component\DependencyInjection\Loader\Configurator\DefaultsConfigurator;
 use Symfony\Component\HttpKernel\Bundle\AbstractBundle;
-use Symfony\Component\DependencyInjection\Loader\Configurator\DefinitionConfigurator;
+use Symfony\Component\Config\Definition\Configurator\DefinitionConfigurator;
+use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 
 class ObsidianeAuthBundle extends AbstractBundle
 {
@@ -16,13 +14,15 @@ class ObsidianeAuthBundle extends AbstractBundle
     {
         // obsidiane_auth:
         //   base_url: 'https://auth.example.com'
+        /** @var ArrayNodeDefinition $root */
         $root = $definition->rootNode();
-        $root
-            ->children()
-                ->scalarNode('base_url')->defaultNull()->end()
-            ->end();
+        $children = $root->children();
+        $children->scalarNode('base_url')->defaultNull();
     }
 
+    /**
+     * @param array<string, mixed> $config
+     */
     public function loadExtension(array $config, ContainerConfigurator $container, ContainerBuilder $builder): void
     {
         // Expose parameter from bundle config
@@ -32,4 +32,3 @@ class ObsidianeAuthBundle extends AbstractBundle
         $container->import(__DIR__.'/../config/services.php');
     }
 }
-

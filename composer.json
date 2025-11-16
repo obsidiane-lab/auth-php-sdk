@@ -1,5 +1,5 @@
 {
-    "name": "obsidiane/auth-bundle",
+    "name": "obsidiane/auth-sdk",
     "description": "Symfony bundle fournissant un client Obsidiane Auth (cookies + CSRF stateless)",
     "type": "symfony-bundle",
     "license": "MIT",

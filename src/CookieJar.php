@@ -21,9 +21,6 @@ final class CookieJar
     {
         foreach ($setCookies as $line) {
             $parts = explode(';', $line);
-            if (count($parts) === 0) {
-                continue;
-            }
             $kv = explode('=', trim($parts[0]), 2);
             if (count($kv) === 2) {
                 $this->cookies[$kv[0]] = $kv[1];

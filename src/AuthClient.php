@@ -3,6 +3,7 @@
 namespace Obsidiane\AuthBundle;
 
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 use Symfony\Component\HttpClient\HttpClient;
 
 /**
@@ -28,6 +29,9 @@ final class AuthClient
         return $this->baseUrl.$path;
     }
 
+    /**
+     * @param array<string, mixed> $headers
+     */
     private function updateCookies(array $headers): void
     {
         $set = [];
@@ -47,11 +51,11 @@ final class AuthClient
      * Perform a request with current cookies and optional CSRF header.
      * @param array<string,mixed> $options
      */
-    private function request(string $method, string $path, array $options = [], ?string $csrf = null)
+    private function request(string $method, string $path, array $options = [], ?string $csrf = null): ResponseInterface
     {
         $headers = $options['headers'] ?? [];
         if ($csrf) {
-            $headers['X-CSRF-TOKEN'] = $csrf;
+            $headers['csrf-token'] = $csrf;
         }
 
         $cookieHeader = $this->jar->toHeader();
@@ -63,23 +67,6 @@ final class AuthClient
         $response = $this->http->request($method, $this->url($path), $options);
         $this->updateCookies($response->getHeaders(false));
         return $response;
-    }
-
-    public function fetchCsrfToken(string $tokenId): string
-    {
-        $res = $this->request('GET', '/api/auth/csrf/'.rawurlencode($tokenId));
-
-        if ($res->getStatusCode() >= 400) {
-            throw new \RuntimeException('csrf_failed: '.$res->getStatusCode());
-        }
-
-        $payload = $res->toArray(false);
-
-        if (!isset($payload['token']) || !is_string($payload['token']) || $payload['token'] === '') {
-            throw new \RuntimeException('csrf_invalid_payload');
-        }
-
-        return $payload['token'];
     }
 
     /**
@@ -95,15 +82,20 @@ final class AuthClient
         return $res->toArray(false);
     }
 
+    private function generateCsrfToken(): string
+    {
+        return bin2hex(random_bytes(16));
+    }
+
     /**
      * POST /api/login (CSRF required)
      * @return array<string,mixed>
      */
-    public function login(string $email, string $password, string $csrf): array
+    public function login(string $email, string $password): array
     {
         $res = $this->request('POST', '/api/login', [
             'json' => [ 'email' => $email, 'password' => $password ],
-        ], $csrf);
+        ], $this->generateCsrfToken());
         if ($res->getStatusCode() >= 400) {
             throw new \RuntimeException('login_failed: '.$res->getStatusCode());
         }
@@ -124,9 +116,9 @@ final class AuthClient
     }
 
     /** POST /api/auth/logout (CSRF required) */
-    public function logout(string $csrf): void
+    public function logout(): void
     {
-        $res = $this->request('POST', '/api/auth/logout', [], $csrf);
+        $res = $this->request('POST', '/api/auth/logout', [], $this->generateCsrfToken());
         $code = $res->getStatusCode();
         if ($code !== 204 && $code >= 400) {
             throw new \RuntimeException('logout_failed: '.$code);
@@ -138,9 +130,9 @@ final class AuthClient
      * @param array<string,mixed> $input
      * @return array<string,mixed>
      */
-    public function register(array $input, string $csrf): array
+    public function register(array $input): array
     {
-        $res = $this->request('POST', '/api/auth/register', [ 'json' => $input ], $csrf);
+        $res = $this->request('POST', '/api/auth/register', [ 'json' => $input ], $this->generateCsrfToken());
         if ($res->getStatusCode() >= 400) {
             throw new \RuntimeException('register_failed: '.$res->getStatusCode());
         }
@@ -151,9 +143,9 @@ final class AuthClient
      * POST /reset-password (CSRF `password_request` requis)
      * @return array<string,mixed>
      */
-    public function passwordRequest(string $email, string $csrf): array
+    public function passwordRequest(string $email): array
     {
-        $res = $this->request('POST', '/reset-password', [ 'json' => [ 'email' => $email ] ], $csrf);
+        $res = $this->request('POST', '/reset-password', [ 'json' => [ 'email' => $email ] ], $this->generateCsrfToken());
         if ($res->getStatusCode() >= 400) {
             throw new \RuntimeException('password_request_failed: '.$res->getStatusCode());
         }
@@ -161,9 +153,9 @@ final class AuthClient
     }
 
     /** POST /reset-password/reset (CSRF `password_reset` requis) */
-    public function passwordReset(string $token, string $password, string $csrf): void
+    public function passwordReset(string $token, string $password): void
     {
-        $res = $this->request('POST', '/reset-password/reset', [ 'json' => [ 'token' => $token, 'password' => $password ] ], $csrf);
+        $res = $this->request('POST', '/reset-password/reset', [ 'json' => [ 'token' => $token, 'password' => $password ] ], $this->generateCsrfToken());
         $code = $res->getStatusCode();
         if ($code !== 204 && $code >= 400) {
             throw new \RuntimeException('password_reset_failed: '.$code);
