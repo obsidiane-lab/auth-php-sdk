@@ -6,11 +6,9 @@ use Obsidiane\AuthBundle\Exception\ApiErrorException;
 use Obsidiane\AuthBundle\Model\Invite as InviteModel;
 use Obsidiane\AuthBundle\Model\Collection;
 use Obsidiane\AuthBundle\Model\User as UserModel;
-use Symfony\Component\HttpClient\Cookie\CookieJar;
-use Symfony\Component\HttpClient\Cookie\CookieJarInterface;
-use Symfony\Contracts\HttpClient\HttpClientInterface;
-use Symfony\Contracts\HttpClient\ResponseInterface;
+use Symfony\Component\BrowserKit\HttpBrowser;
 use Symfony\Component\HttpClient\HttpClient;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 
 /**
  * Minimal PHP SDK to interact with Obsidiane Auth endpoints.
@@ -19,9 +17,8 @@ use Symfony\Component\HttpClient\HttpClient;
  */
 final class AuthClient
 {
-    private HttpClientInterface $http;
+    private HttpBrowser $browser;
     private string $baseUrl;
-    private CookieJarInterface $jar;
     private ?string $origin;
     /** @var array<string,string> */
     private array $defaultHeaders;
@@ -30,14 +27,18 @@ final class AuthClient
     /**
      * @param array<string,string> $defaultHeaders
      */
-    public function __construct(?HttpClientInterface $http = null, string $baseUrl = '', array $defaultHeaders = [], ?int $timeoutMs = null)
+    public function __construct(?HttpBrowser $browser = null, string $baseUrl = '', array $defaultHeaders = [], ?int $timeoutMs = null)
     {
         if ($baseUrl === '') {
             throw new \InvalidArgumentException('baseUrl is required');
         }
 
-        $this->jar = new CookieJar();
-        $this->http = $http ?? HttpClient::create(['cookies' => $this->jar]);
+        $clientOptions = ['cookies' => true];
+        if ($timeoutMs !== null && $timeoutMs > 0) {
+            $clientOptions['timeout'] = $timeoutMs / 1000;
+        }
+
+        $this->browser = $browser ?? new HttpBrowser(HttpClient::create($clientOptions));
         $this->baseUrl = rtrim($baseUrl, '/');
         $this->origin = $this->computeOrigin($this->baseUrl);
         $this->defaultHeaders = $defaultHeaders;
@@ -67,13 +68,35 @@ final class AuthClient
             $headers
         );
 
-        $options['headers'] = $headers + ['Content-Type' => 'application/json'];
-
-        if (!isset($options['timeout']) && $this->timeoutMs !== null && $this->timeoutMs > 0) {
-            $options['timeout'] = $this->timeoutMs / 1000;
+        $server = $this->buildServerHeaders($headers);
+        $content = $options['body'] ?? null;
+        if (isset($options['json'])) {
+            $content = json_encode($options['json'], JSON_THROW_ON_ERROR);
         }
 
-        return $this->http->request($method, $this->url($path), $options);
+        $this->browser->request($method, $this->url($path), [], [], $server, $content ?? '');
+        return $this->browser->getResponse();
+    }
+
+    /**
+     * @param array<string,string> $headers
+     * @return array<string,string>
+     */
+    private function buildServerHeaders(array $headers): array
+    {
+        $server = [];
+        foreach ($headers as $name => $value) {
+            $key = strtoupper(str_replace('-', '_', $name));
+            if ($key === 'CONTENT_TYPE') {
+                $server['CONTENT_TYPE'] = $value;
+            } elseif ($key === 'ACCEPT') {
+                $server['HTTP_ACCEPT'] = $value;
+            } else {
+                $server['HTTP_'.$key] = $value;
+            }
+        }
+
+        return $server;
     }
 
     private function computeOrigin(string $baseUrl): ?string
