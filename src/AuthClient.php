@@ -27,7 +27,7 @@ final class AuthClient
     /**
      * @param array<string,string> $defaultHeaders
      */
-    public function __construct(?HttpBrowser $browser = null, string $baseUrl = '', array $defaultHeaders = [], ?int $timeoutMs = null)
+    public function __construct(string $baseUrl = '', array $defaultHeaders = [], ?int $timeoutMs = null)
     {
         if ($baseUrl === '') {
             throw new \InvalidArgumentException('baseUrl is required');
@@ -38,7 +38,7 @@ final class AuthClient
             $clientOptions['timeout'] = $timeoutMs / 1000;
         }
 
-        $this->browser = $browser ?? new HttpBrowser(HttpClient::create($clientOptions));
+        $this->browser = new HttpBrowser(HttpClient::create($clientOptions));
         $this->baseUrl = rtrim($baseUrl, '/');
         $this->origin = $this->computeOrigin($this->baseUrl);
         $this->defaultHeaders = $defaultHeaders;

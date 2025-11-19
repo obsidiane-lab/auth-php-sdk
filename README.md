@@ -30,16 +30,10 @@ obsidiane_auth:
   base_url: '%env(string:OBSIDIANE_AUTH_BASE_URL)%'
 ```
 
-Le client repose sur `HttpBrowser` (BrowserKit) + `HttpClient` pour bénéficier d’un `CookieJar` complet (domaine/path/secure/expiration).
-
-Si vous instanciez manuellement le client (hors bundle), fournissez au moins `baseUrl` et, si besoin, des en-têtes par défaut / un timeout :
+Le client repose sur `HttpBrowser` (BrowserKit) + `HttpClient` pour bénéficier d’un `CookieJar` complet (domaine/path/secure/expiration). Par défaut, le bundle instancie lui-même le navigateur avec les cookies activés : aucune configuration supplémentaire n’est requise (il suffit de définir `base_url`).
 
 ```php
-use Symfony\Component\BrowserKit\HttpBrowser;
-use Symfony\Component\HttpClient\HttpClient;
-
 $auth = new \Obsidiane\AuthBundle\AuthClient(
-    browser: new HttpBrowser(HttpClient::create()),
     baseUrl: 'https://auth.example.com',
     defaultHeaders: ['X-App' => 'my-service'],
     timeoutMs: 10000
