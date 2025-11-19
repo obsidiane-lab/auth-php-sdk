@@ -37,38 +37,30 @@ final class AuthClient
     }
 
     /**
-     * GET a JSON resource.
+     * GET a JSON-LD resource.
      *
      * @return array<string,mixed>
      */
-    private function getJson(string $path): array
+    private function getJsonLd(string $path): array
     {
         return $this->api->requestJson('GET', $path);
     }
 
     /**
-     * GET a JSON collection and map each item.
+     * GET a JSON-LD collection and map each item.
      *
      * @template T
      * @param callable(array<string,mixed>):T $mapper
      * @return list<T>
      */
-    private function getJsonCollection(string $path, callable $mapper): array
+    private function getJsonLdCollection(string $path, callable $mapper): array
     {
-        $data = $this->getJson($path);
+        $data = $this->getJsonLd($path);
 
-        $rows = [];
-        if (isset($data['items']) && is_array($data['items'])) {
-            $rows = $data['items'];
-        } elseif (is_array($data)) {
-            $rows = $data;
-        }
-
+        $collection = Collection::fromArray($data);
         $items = [];
-        foreach ($rows as $row) {
-            if (is_array($row)) {
-                $items[] = $mapper($row);
-            }
+        foreach ($collection->all() as $item) {
+            $items[] = $mapper($item->data());
         }
 
         return $items;
@@ -238,7 +230,7 @@ final class AuthClient
      */
     public function listUsers(): array
     {
-        return $this->getJsonCollection(
+        return $this->getJsonLdCollection(
             self::PATH_USERS,
             static fn (array $row): UserModel => UserModel::fromArray($row),
         );
@@ -249,7 +241,7 @@ final class AuthClient
      */
     public function getUser(int $id): UserModel
     {
-        $data = $this->getJson(self::PATH_USERS.'/'.$id);
+        $data = $this->getJsonLd(self::PATH_USERS.'/'.$id);
 
         return UserModel::fromArray($data);
     }
@@ -261,7 +253,7 @@ final class AuthClient
      */
     public function listInvites(): array
     {
-        return $this->getJsonCollection(
+        return $this->getJsonLdCollection(
             self::PATH_INVITE_USERS,
             static fn (array $row): InviteModel => InviteModel::fromArray($row),
         );
@@ -272,7 +264,7 @@ final class AuthClient
      */
     public function getInvite(int $id): InviteModel
     {
-        $data = $this->getJson(self::PATH_INVITE_USERS.'/'.$id);
+        $data = $this->getJsonLd(self::PATH_INVITE_USERS.'/'.$id);
 
         return InviteModel::fromArray($data);
     }
@@ -282,6 +274,6 @@ final class AuthClient
      */
     public function deleteUser(int $id): void
     {
-        $this->api->requestJson('DELETE', '/api/users/'.$id);
+        $this->api->requestJson('DELETE', self::PATH_USERS.'/'.$id);
     }
 }
