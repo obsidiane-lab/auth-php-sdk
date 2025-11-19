@@ -28,6 +28,8 @@ return [
 ```
 obsidiane_auth:
   base_url: '%env(string:OBSIDIANE_AUTH_BASE_URL)%'
+  # Facultatif mais recommandé : doit matcher la politique ALLOWED_ORIGINS côté Auth
+  origin: '%env(string:OBSIDIANE_AUTH_ORIGIN)%'
 ```
 
 Le client repose sur `HttpBrowser` (BrowserKit) + `HttpClient` pour bénéficier d’un `CookieJar` complet (domaine/path/secure/expiration). Par défaut, le bundle instancie lui-même le navigateur avec les cookies activés : aucune configuration supplémentaire n’est requise (il suffit de définir `base_url`).

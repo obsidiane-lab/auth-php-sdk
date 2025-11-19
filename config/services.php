@@ -18,5 +18,8 @@ return static function (ContainerConfigurator $config): void {
     $services->set(AuthClient::class)
         ->args([
             param('obsidiane_auth.base_url'),
+            [],
+            null,
+            param('obsidiane_auth.origin'),
         ]);
 };
