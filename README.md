@@ -110,6 +110,10 @@ Le SDK fournit des modèles simples qui reflètent les ressources exposées par 
 
 Les méthodes d’API suivantes renvoient désormais **le JSON‑LD brut** :
 
+- `GET /api/users`
+- `GET /api/users/{id}`
+- `POST /api/users/{id}/roles` (admin, CSRF stateless généré automatiquement)
+
 ```php
 // GET /api/users
 /** @var array<string,mixed> $collection */
@@ -118,6 +122,10 @@ $collection = $this->auth->users()->list();
 // GET /api/users/1
 /** @var array<string,mixed> $userResource */
 $userResource = $this->auth->users()->get(1);
+
+// POST /api/users/{id}/roles (admin + CSRF)
+/** @var array<string,mixed> $updated */
+$updated = $this->auth->users()->updateRoles(1, ['ROLE_ADMIN']);
 ```
 
 Si vous souhaitez projeter ces payloads en objets typés, vous pouvez utiliser `Item`/`Collection` ou vos propres DTO :
