@@ -46,7 +46,8 @@ final class AuthEndpoint
      *         id: int,
      *         email: string,
      *         roles: list<string>,
-     *         isEmailVerified?: bool
+     *         emailVerified?: bool,
+     *         lastLoginAt?: ?string
      *     },
      *     exp: int
      * }
@@ -184,4 +185,3 @@ final class AuthEndpoint
         return [self::CSRF_HEADER => $csrf];
     }
 }
-

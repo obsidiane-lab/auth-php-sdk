@@ -101,7 +101,7 @@ Le SDK fournit des modèles simples qui reflètent les ressources exposées par 
 
 - `Obsidiane\AuthBundle\Model\Item<T>` : wrapper générique pour un item JSON‑LD (métadonnées `@id`, `@type`, `@context` + attributs métiers).
 - `Obsidiane\AuthBundle\Model\Collection<T>` : wrapper générique pour une collection JSON‑LD (métadonnées + tableau d’items + `totalItems`).
-- `Obsidiane\AuthBundle\Model\User` : projection métier simple (`id`, `email`, `roles`, `isEmailVerified`), optionnelle.
+- `Obsidiane\AuthBundle\Model\User` : projection métier simple (`id`, `email`, `roles`, `emailVerified`, `lastLoginAt`), optionnelle.
 - `Obsidiane\AuthBundle\Model\Invite` : projection métier simple (`id`, `email`, `createdAt`, `expiresAt`, `acceptedAt`), optionnelle.
 
 `Item` et `Collection` disposent d’une méthode `fromArray(array $data)` compatible avec les payloads JSON‑LD retournés par `/api/users/*` et `/api/invite_users*`. Elles permettent de travailler directement avec la représentation JSON‑LD exposée par l’API.

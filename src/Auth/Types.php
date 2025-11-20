@@ -17,7 +17,8 @@ final class Types
      *         id: int,
      *         email: string,
      *         roles: list<string>,
-     *         isEmailVerified?: bool
+     *         emailVerified?: bool,
+     *         lastLoginAt?: ?string
      *     },
      *     exp: int
      * }
@@ -33,15 +34,17 @@ final class Types
             }
         }
 
+        $emailVerifiedRaw = $user['emailVerified'] ?? $user['isEmailVerified'] ?? null;
+
         return [
             'user' => [
                 'id' => isset($user['id']) ? (int) $user['id'] : 0,
                 'email' => (string) ($user['email'] ?? ''),
                 'roles' => $roles,
-                'isEmailVerified' => isset($user['isEmailVerified']) ? (bool) $user['isEmailVerified'] : false,
+                'lastLoginAt' => isset($user['lastLoginAt']) ? (string) $user['lastLoginAt'] : null,
+                'emailVerified' => $emailVerifiedRaw === null ? null : (bool) $emailVerifiedRaw,
             ],
             'exp' => isset($payload['exp']) ? (int) $payload['exp'] : 0,
         ];
     }
 }
-
