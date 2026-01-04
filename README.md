@@ -1,13 +1,14 @@
 # Obsidiane Auth SDK for PHP
 
-SDK PHP orienté API pour consommer Obsidiane Auth avec une logique proche du SDK JS (bridge + facades). Authentification via Bearer token fixe, pas de cookies.
+SDK PHP orienté API pour consommer Obsidiane Auth avec une logique proche du SDK JS (bridge + facades). Authentification via Bearer token (optionnel), pas de cookies.
 
 ## Features
 
-✅ **Bridge API-first** (get/post/patch/put/delete + request)
+✅ **Bridge API-first** (get/getCollection/post/patch/put/delete + request)
 ✅ **Facades ressources** avec modèles hydratés via Symfony Serializer
 ✅ **JSON-LD par défaut** (`Accept: application/ld+json`)
 ✅ **Content-Type auto** (`POST/PUT: application/ld+json`, `PATCH: application/merge-patch+json`)
+✅ **Exceptions structurées** via `ApiErrorException` sur erreurs HTTP
 ✅ **Configuration Symfony** simple et explicite
 
 ## Installation
@@ -33,7 +34,7 @@ obsidiane_auth:
   token: '%env(OBSIDIANE_AUTH_TOKEN)%' # optionnel
   defaults:
     headers: { }
-    timeout_ms: 10000
+    timeout_ms: 10000 # optionnel
   debug: false
 ```
 
@@ -44,6 +45,7 @@ OBSIDIANE_AUTH_TOKEN=your-static-bearer-token
 ```
 
 Le `token` est optionnel : s'il est absent ou vide, aucun header `Authorization` n'est ajouté (utile pour les endpoints publics).
+`base_url` est requis et peut inclure ou non `/api` selon votre usage (adaptez vos routes en conséquence).
 
 ## Utilisation
 
@@ -86,6 +88,22 @@ final class AuthService
 }
 ```
 
+### Requête custom avec `HttpRequestConfig`
+
+```php
+use Obsidiane\AuthBundle\Bridge\Http\HttpRequestConfig;
+
+$req = new HttpRequestConfig(
+    method: 'GET',
+    url: '/api/users',
+    query: ['page' => 1, 'itemsPerPage' => 20],
+    headers: ['X-Request-ID' => 'req_123'],
+    timeoutMs: 5000,
+);
+
+$response = $bridge->request($req);
+```
+
 ## Hydratation des modèles
 
 Les facades utilisent `Symfony\Component\Serializer\Normalizer\NormalizerInterface` et `DenormalizerInterface` pour la sérialisation/désérialisation.
@@ -98,10 +116,10 @@ Si vous utilisez vos propres modèles, mappez `@id` avec `#[SerializedName('@id'
 
 ### Classes principales
 
-- **`BridgeFacade`** : appels HTTP bas niveau (GET, POST, PUT, PATCH, DELETE, request)
+- **`BridgeFacade`** : appels HTTP bas niveau (GET, GET collection, POST, PUT, PATCH, DELETE, request)
 - **`FacadeFactory`** : création de `ResourceFacade<T>` avec hydratation automatique
 - **`ResourceFacade<T>`** : CRUD + collections hydratées (generic type-safe)
-- **`Collection<T>`** : items + metadata JSON-LD (totalItems, @id, @type, @context, view, search)
+- **`Collection<T>`** : items + metadata JSON-LD (`totalItems`, `id`, `type`, `context`, `view`, `search`)
 
 ### Modèles
 
@@ -111,10 +129,16 @@ Les modèles exposent les propriétés JSON-LD standard :
 
 ### Paramètres de configuration
 
+#### Clés principales
+
+- `base_url` : URL de base du service Auth (requis).
+- `token` : Bearer token optionnel, ajouté si non vide.
+- `debug` : active les logs debug du bridge HTTP.
+
 #### `defaults` (dans `obsidiane_auth.yaml`)
 
 - `headers`: headers HTTP appliqués à toutes les requêtes (peuvent être surchargés par appel)
-- `timeout_ms`: timeout en millisecondes (défaut: 10000)
+- `timeout_ms`: timeout en millisecondes (par défaut: aucun)
 
 #### Options par requête
 
@@ -125,11 +149,14 @@ use Obsidiane\AuthBundle\Bridge\Http\HttpCallOptions;
 
 $options = new HttpCallOptions(
     headers: ['X-Custom-Header' => 'value'],
-    timeout: 5000, // en ms
+    timeoutMs: 5000, // en ms
+    responseType: 'text',
 );
 
 $users->getCollection([], $options);
 ```
+
+`responseType: 'text'` retourne la réponse brute (string). Par défaut, la réponse est décodée en JSON.
 
 ## Exemples avancés
 
@@ -175,16 +202,19 @@ $user = $users->get('/api/users/1', $options);
 ### Gestion d'erreurs
 
 ```php
-use Obsidiane\AuthBundle\Bridge\Exception\BridgeException;
+use Obsidiane\AuthBundle\Exception\ApiErrorException;
 
 try {
     $user = $users->get('/api/users/999');
-} catch (BridgeException $e) {
+} catch (ApiErrorException $e) {
     // Erreur HTTP (404, 500, etc.)
     error_log($e->getMessage());
-    error_log('Status code: ' . $e->getCode());
+    error_log('Status code: ' . $e->getStatusCode());
+    error_log('Error code: ' . $e->getErrorCode());
 }
 ```
+
+`ApiErrorException` expose aussi `getDetails()` et `getPayload()` pour inspecter la réponse.
 
 ## Qualité du code
 
@@ -204,7 +234,7 @@ Si vous obtenez cette erreur, assurez-vous que votre `SerializerInterface` est b
 
 ### Timeout des requêtes
 
-Par défaut, le timeout est de 10 secondes. Pour l'augmenter :
+Par défaut, aucun timeout n'est appliqué. Pour en définir un :
 
 ```yaml
 # config/packages/obsidiane_auth.yaml
@@ -216,6 +246,8 @@ obsidiane_auth:
 Ou par requête :
 
 ```php
-$options = new HttpCallOptions(timeout: 30000);
+use Obsidiane\AuthBundle\Bridge\Http\HttpCallOptions;
+
+$options = new HttpCallOptions(timeoutMs: 30000);
 $result = $users->getCollection([], $options);
 ```
