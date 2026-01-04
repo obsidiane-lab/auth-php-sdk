@@ -88,18 +88,134 @@ final class AuthService
 
 ## Hydratation des modèles
 
-Les facades utilisent `Symfony\Component\Serializer\SerializerInterface::denormalize()`.
+Les facades utilisent `Symfony\Component\Serializer\Normalizer\NormalizerInterface` et `DenormalizerInterface` pour la sérialisation/désérialisation.
 Les modèles du SDK exposent `@id` via la propriété `$iri`.
 Si vous utilisez vos propres modèles, mappez `@id` avec `#[SerializedName('@id')]`.
 
+**Note technique** : Le SDK nécessite que le `SerializerInterface` implémente aussi `NormalizerInterface` et `DenormalizerInterface` (ce qui est le cas avec le Serializer standard de Symfony). Le `FacadeFactory` vérifie automatiquement ces interfaces au runtime.
+
 ## API publique
 
-- `BridgeFacade` : appels HTTP bas niveau
-- `FacadeFactory` : création de `ResourceFacade<T>`
-- `ResourceFacade<T>` : CRUD + collections hydratées
-- `Collection<T>` : items + metadata JSON-LD
+### Classes principales
 
-## Paramètres `defaults`
+- **`BridgeFacade`** : appels HTTP bas niveau (GET, POST, PUT, PATCH, DELETE, request)
+- **`FacadeFactory`** : création de `ResourceFacade<T>` avec hydratation automatique
+- **`ResourceFacade<T>`** : CRUD + collections hydratées (generic type-safe)
+- **`Collection<T>`** : items + metadata JSON-LD (totalItems, @id, @type, @context, view, search)
 
-- `headers`: headers appliqués à toutes les requêtes (surchargés par appel)
-- `timeout_ms`: timeout en millisecondes
+### Modèles
+
+Les modèles exposent les propriétés JSON-LD standard :
+- `Item` : classe de base avec `$iri` (`@id`), `$type` (`@type`), `$context` (`@context`)
+- Tous les modèles générés héritent de `Item` ou exposent ces propriétés
+
+### Paramètres de configuration
+
+#### `defaults` (dans `obsidiane_auth.yaml`)
+
+- `headers`: headers HTTP appliqués à toutes les requêtes (peuvent être surchargés par appel)
+- `timeout_ms`: timeout en millisecondes (défaut: 10000)
+
+#### Options par requête
+
+Toutes les méthodes de `ResourceFacade` et `BridgeFacade` acceptent un paramètre `HttpCallOptions` optionnel :
+
+```php
+use Obsidiane\AuthBundle\Bridge\Http\HttpCallOptions;
+
+$options = new HttpCallOptions(
+    headers: ['X-Custom-Header' => 'value'],
+    timeout: 5000, // en ms
+);
+
+$users->getCollection([], $options);
+```
+
+## Exemples avancés
+
+### Filtrage et pagination
+
+```php
+$users = $factory->create('/api/users', UserRead::class);
+
+// Pagination
+$result = $users->getCollection([
+    'page' => 2,
+    'itemsPerPage' => 10,
+]);
+
+// Filtres
+$result = $users->getCollection([
+    'filters' => [
+        'email' => 'user@example.com',
+        'role' => 'ROLE_ADMIN',
+    ],
+]);
+
+// Metadata
+echo $result->totalItems;  // Nombre total d'items
+echo $result->id;          // IRI de la collection (@id)
+```
+
+### Headers personnalisés
+
+```php
+use Obsidiane\AuthBundle\Bridge\Http\HttpCallOptions;
+
+$options = new HttpCallOptions(
+    headers: [
+        'X-Request-ID' => uniqid(),
+        'Accept-Language' => 'fr-FR',
+    ],
+);
+
+$user = $users->get('/api/users/1', $options);
+```
+
+### Gestion d'erreurs
+
+```php
+use Obsidiane\AuthBundle\Bridge\Exception\BridgeException;
+
+try {
+    $user = $users->get('/api/users/999');
+} catch (BridgeException $e) {
+    // Erreur HTTP (404, 500, etc.)
+    error_log($e->getMessage());
+    error_log('Status code: ' . $e->getCode());
+}
+```
+
+## Qualité du code
+
+Le SDK maintient une qualité de code stricte :
+
+- ✅ **PHPStan Level 6** : Zero erreur d'analyse statique
+- ✅ **Types stricts** : `declare(strict_types=1)` dans tous les fichiers
+- ✅ **Generics** : `ResourceFacade<T>`, `Collection<T>` pour type-safety
+- ✅ **Readonly** : Classes immuables avec `readonly`
+- ✅ **PSR-12** : Standard de code PHP
+
+## Troubleshooting
+
+### Erreur "Serializer must implement NormalizerInterface"
+
+Si vous obtenez cette erreur, assurez-vous que votre `SerializerInterface` est bien le Serializer standard de Symfony (pas un mock ou une implémentation custom sans normalizer).
+
+### Timeout des requêtes
+
+Par défaut, le timeout est de 10 secondes. Pour l'augmenter :
+
+```yaml
+# config/packages/obsidiane_auth.yaml
+obsidiane_auth:
+  defaults:
+    timeout_ms: 30000  # 30 secondes
+```
+
+Ou par requête :
+
+```php
+$options = new HttpCallOptions(timeout: 30000);
+$result = $users->getCollection([], $options);
+```
