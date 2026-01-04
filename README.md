@@ -216,6 +216,28 @@ try {
 
 `ApiErrorException` expose aussi `getDetails()` et `getPayload()` pour inspecter la réponse.
 
+### Codes d’erreur (API)
+
+Statuts HTTP exposés par l’API Auth :
+
+| HTTP | Cas principaux | Détails |
+| ---: | --- | --- |
+| 400 | Requête invalide, token invalide | `verify-email` (id manquant), reset/verify token invalide, invitation sans token (`details.token = INVALID_INVITATION`). |
+| 401 | Non authentifié | `me`, JWT invalide/expiré, service token invalide, login refusé. |
+| 403 | Accès refusé | Origin/Referer non autorisé, endpoints admin sans rôle. |
+| 404 | Introuvable | Invitation inconnue, user introuvable, inscription désactivée. |
+| 409 | Conflit | Email déjà utilisé, invitation déjà acceptée, bootstrap requis ou déjà fait. |
+| 410 | Expiré | Invitation expirée, lien de vérification expiré, reset token expiré. |
+| 422 | Validation | Email/mot de passe invalides, champs requis, `INVALID_ROLES`, confirmation mot de passe. |
+| 423 | Verrouillé | Email non vérifié lors du login. |
+| 429 | Rate limit | Login, register, invite, invite/complete, password/forgot/reset, setup/admin. |
+| 500 | Erreur interne | Échec de reset password non géré (`ResetRequestFailedException`). |
+| 503 | Service indisponible | Échec d’envoi d’email (`MailDispatchException`). |
+
+Identifiants d’erreurs utiles dans les payloads/validations :
+- `INVALID_INVITATION`
+- `INVALID_ROLES`
+
 ## Qualité du code
 
 Le SDK maintient une qualité de code stricte :
