@@ -238,6 +238,11 @@ Identifiants d’erreurs utiles dans les payloads/validations :
 - `INVALID_INVITATION`
 - `INVALID_ROLES`
 
+### Invitation (règles métiers)
+
+- Un utilisateur **déjà vérifié** ne peut pas être ré-invité.
+- Un utilisateur **non vérifié** peut être ré-invité : l’email est renvoyé si l’invitation est encore valide, sinon elle est régénérée.
+
 ## Qualité du code
 
 Le SDK maintient une qualité de code stricte :
