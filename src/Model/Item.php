@@ -1,54 +1,25 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Obsidiane\AuthBundle\Model;
 
-/**
- * Représente un item JSON-LD enrichi :
- * - métadonnées @id, @type, @context
- * - attributs métiers au même niveau.
- *
- * @template TAttributes of array<string,mixed>
- */
-final class Item
+use Symfony\Component\Serializer\Attribute\SerializedName;
+
+class Item
 {
-    /**
-     * @param TAttributes              $attributes
-     * @param array<string,mixed>|null $context
-     */
-    public function __construct(
-        public ?string $id,
-        public string|array|null $type,
-        public array $attributes,
-        public ?array $context = null,
-    ) {
-    }
+    #[SerializedName('@id')]
+    public ?string $iri = null;
 
     /**
-     * @param array<string,mixed> $data
-     *
-     * @return self<array<string,mixed>>
+     * @var string|array<mixed>|null
      */
-    public static function fromArray(array $data): self
-    {
-        $id = isset($data['@id']) ? (string) $data['@id'] : null;
-        $type = $data['@type'] ?? null;
-
-        $context = null;
-        if (isset($data['@context']) && is_array($data['@context'])) {
-            $context = $data['@context'];
-        }
-
-        unset($data['@id'], $data['@type'], $data['@context']);
-
-        return new self($id, $type, $data, $context);
-    }
+    #[SerializedName('@type')]
+    public string|array|null $type = null;
 
     /**
-     * @return TAttributes
+     * @var string|array<string,mixed>|null
      */
-    public function data(): array
-    {
-        return $this->attributes;
-    }
+    #[SerializedName('@context')]
+    public string|array|null $context = null;
 }
-

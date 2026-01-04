@@ -20,6 +20,8 @@ final class ObsidianeAuthExtension extends Extension
         $loader->load('services.php');
 
         $container->setParameter('obsidiane_auth.base_url', $config['base_url']);
-        $container->setParameter('obsidiane_auth.origin', $config['origin']);
+        $container->setParameter('obsidiane_auth.token', $config['token']);
+        $container->setParameter('obsidiane_auth.defaults', $config['defaults']);
+        $container->setParameter('obsidiane_auth.debug', $config['debug']);
     }
 }

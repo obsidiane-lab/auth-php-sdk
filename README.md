@@ -1,178 +1,105 @@
-# Obsidiane Auth Bundle
+# Obsidiane Auth SDK for PHP
 
-Bundle Symfony fournissant un client HTTP prêt à l’emploi pour l’API Obsidiane Auth (cookies + CSRF stateless).
+SDK PHP orienté API pour consommer Obsidiane Auth avec une logique proche du SDK JS (bridge + facades). Authentification via Bearer token fixe, pas de cookies.
+
+## Features
+
+✅ **Bridge API-first** (get/post/patch/put/delete + request)
+✅ **Facades ressources** avec modèles hydratés via Symfony Serializer
+✅ **JSON-LD par défaut** (`Accept: application/ld+json`)
+✅ **Content-Type auto** (`POST/PUT: application/ld+json`, `PATCH: application/merge-patch+json`)
+✅ **Configuration Symfony** simple et explicite
 
 ## Installation
 
-1. Requérir le bundle (publié sur Packagist) :
-
-```
-composer require obsidiane/auth-sdk:<VERSION>
+```bash
+composer require obsidiane/auth-sdk
 ```
 
-2. Activer le bundle si Flex ne l’ajoute pas automatiquement:
+## Configuration Symfony
 
-`config/bundles.php`
-
-```
+**config/bundles.php**
+```php
 return [
     // ...
     Obsidiane\AuthBundle\ObsidianeAuthBundle::class => ['all' => true],
 ];
 ```
 
-## Configuration
-
-`config/packages/obsidiane_auth.yaml` (optionnel):
-
-```
+**config/packages/obsidiane_auth.yaml**
+```yaml
 obsidiane_auth:
-  base_url: '%env(string:OBSIDIANE_AUTH_BASE_URL)%'
-  # Facultatif mais recommandé : doit matcher la politique ALLOWED_ORIGINS côté Auth
-  origin: '%env(string:OBSIDIANE_AUTH_ORIGIN)%'
+  base_url: '%env(OBSIDIANE_AUTH_BASE_URL)%'
+  token: '%env(OBSIDIANE_AUTH_TOKEN)%' # optionnel
+  defaults:
+    headers: { }
+    timeout_ms: 10000
+  debug: false
 ```
 
-Le client repose sur `HttpBrowser` (BrowserKit) + `HttpClient` pour bénéficier d’un `CookieJar` complet (domaine/path/secure/expiration). Par défaut, le bundle instancie lui-même le navigateur avec les cookies activés : aucune configuration supplémentaire n’est requise (il suffit de définir `base_url`).
-
-```php
-$auth = new \Obsidiane\AuthBundle\AuthClient(
-    baseUrl: 'https://auth.example.com',
-    defaultHeaders: ['X-App' => 'my-service'],
-    timeoutMs: 10000,
-    // Origin HTTP utilisé pour la validation CSRF stateless.
-    // Doit matcher la politique ALLOWED_ORIGINS ou le host du service d'auth.
-    origin: 'https://app.example.com'
-);
+**.env**
+```bash
+OBSIDIANE_AUTH_BASE_URL=https://auth.example.com
+OBSIDIANE_AUTH_TOKEN=your-static-bearer-token
 ```
+
+Le `token` est optionnel : s'il est absent ou vide, aucun header `Authorization` n'est ajouté (utile pour les endpoints publics).
 
 ## Utilisation
 
-Injection de `Obsidiane\AuthBundle\AuthClient` dans vos services/contrôleurs:
+### FacadeFactory (ressources)
 
 ```php
-public function __construct(private AuthClient $auth) {}
+use Obsidiane\AuthBundle\Bridge\FacadeFactory;
 
-public function login(): Response
+final class UsersService
 {
-    // POST /api/auth/login
-    $payload = $this->auth->auth()->login('user@example.com', 'Secret123!');
-    // ...
-}
-```
+    public function __construct(
+        private readonly FacadeFactory $factory,
+    ) {}
 
-`base_url` est requis. Le client gère automatiquement les cookies (access/refresh) et génère lui‑même un token CSRF stateless envoyé dans l’en‑tête `csrf-token` pour les mutations. Par défaut, il envoie `Accept: application/ld+json` et peut recevoir des en‑têtes supplémentaires via `$defaultHeaders` si vous instanciez manuellement le client.
+    public function listUsers(): array
+    {
+        $users = $this->factory->create('/api/users', \App\Dto\UserRead::class);
+        $result = $users->getCollection();
 
-### Gestion des erreurs
-
-Toutes les erreurs HTTP de l’API lèvent désormais une `Obsidiane\AuthBundle\Exception\ApiErrorException` contenant :
-
-- `getStatusCode()` : le status HTTP ;
-- `getErrorCode()` : le code métier renvoyé par l’API (ex. `EMAIL_ALREADY_USED`) ;
-- `getDetails()` : le tableau `details` renvoyé par l’API le cas échéant.
-
-```php
-use Obsidiane\AuthBundle\Exception\ApiErrorException;
-
-try {
-    $this->auth->auth()->inviteUser('invitee@example.com');
-} catch (ApiErrorException $e) {
-    if ($e->getErrorCode() === 'EMAIL_ALREADY_USED') {
-        // ce compte est déjà actif
+        return $result->items; // list<UserRead>
     }
 }
 ```
 
-Pour le détail des endpoints et des flows d’authentification, reportez‑vous au `README.md` du projet principal.
-
-Pour des appels HTTP personnalisés, vous pouvez également générer un token CSRF compatible via :
+### BridgeFacade (endpoints custom)
 
 ```php
-$csrf = $this->auth->generateCsrfToken();
-// puis l'envoyer dans l'en-tête "csrf-token" de votre requête custom
-```
+use Obsidiane\AuthBundle\Bridge\BridgeFacade;
 
----
+final class AuthService
+{
+    public function __construct(
+        private readonly BridgeFacade $bridge,
+    ) {}
 
-## Modèles & routes API Platform
-
-Le SDK fournit des modèles simples qui reflètent les ressources exposées par API Platform, ainsi que des helpers pour les consommer.
-
-### Modèles
-
-- `Obsidiane\AuthBundle\Model\Item<T>` : wrapper générique pour un item JSON‑LD (métadonnées `@id`, `@type`, `@context` + attributs métiers).
-- `Obsidiane\AuthBundle\Model\Collection<T>` : wrapper générique pour une collection JSON‑LD (métadonnées + tableau d’items + `totalItems`).
-- `Obsidiane\AuthBundle\Model\User` : projection métier simple (`id`, `email`, `roles`, `emailVerified`, `lastLoginAt`), optionnelle.
-- `Obsidiane\AuthBundle\Model\Invite` : projection métier simple (`id`, `email`, `createdAt`, `expiresAt`, `acceptedAt`), optionnelle.
-
-`Item` et `Collection` disposent d’une méthode `fromArray(array $data)` compatible avec les payloads JSON‑LD retournés par `/api/users/*` et `/api/invite_users*`. Elles permettent de travailler directement avec la représentation JSON‑LD exposée par l’API.
-
-### Ressource User (Api Platform)
-
-Les méthodes d’API suivantes renvoient désormais **le JSON‑LD brut** :
-
-- `GET /api/users`
-- `GET /api/users/{id}`
-- `POST /api/users/{id}/roles` (admin, CSRF stateless généré automatiquement)
-
-```php
-// GET /api/users
-/** @var array<string,mixed> $collection */
-$collection = $this->auth->users()->list();
-
-// GET /api/users/1
-/** @var array<string,mixed> $userResource */
-$userResource = $this->auth->users()->get(1);
-
-// POST /api/users/{id}/roles (admin + CSRF)
-/** @var array<string,mixed> $updated */
-$updated = $this->auth->users()->updateRoles(1, ['ROLE_ADMIN']);
-```
-
-Si vous souhaitez projeter ces payloads en objets typés, vous pouvez utiliser `Item`/`Collection` ou vos propres DTO :
-
-```php
-use Obsidiane\AuthBundle\Model\Collection;
-use Obsidiane\AuthBundle\Model\Item;
-
-/** @var array<string,mixed> $collection */
-$collection = $this->auth->users()->list();
-
-// Collection JSON-LD
-$users = Collection::fromArray($collection);
-
-// Items JSON-LD
-/** @var Item<array<string,mixed>> $first */
-$first = $users->all()[0] ?? null;
-
-if ($first !== null) {
-    $attributes = $first->data(); // ['email' => '...', 'roles' => [...], ...]
+    public function me(): array
+    {
+        return $this->bridge->get('/api/auth/me');
+    }
 }
 ```
 
-### Ressource InviteUser (Api Platform)
+## Hydratation des modèles
 
-Même logique pour `/api/invite_users` :
+Les facades utilisent `Symfony\Component\Serializer\SerializerInterface::denormalize()`.
+Les modèles du SDK exposent `@id` via la propriété `$iri`.
+Si vous utilisez vos propres modèles, mappez `@id` avec `#[SerializedName('@id')]`.
 
-```php
-// GET /api/invite_users
-/** @var array<string,mixed> $collection */
-$collection = $this->auth->invites()->list();
+## API publique
 
-// GET /api/invite_users/1
-/** @var array<string,mixed> $inviteResource */
-$inviteResource = $this->auth->invites()->get(1);
-```
+- `BridgeFacade` : appels HTTP bas niveau
+- `FacadeFactory` : création de `ResourceFacade<T>`
+- `ResourceFacade<T>` : CRUD + collections hydratées
+- `Collection<T>` : items + metadata JSON-LD
 
-Là encore, vous pouvez utiliser `Collection::fromArray()` et `Item::fromArray()` pour manipuler la structure JSON‑LD si besoin, ou projeter ces données vers vos propres modèles (par exemple `Invite` côté application).
+## Paramètres `defaults`
 
-### Helpers d’invitation (endpoints auth)
-
-```php
-// POST /api/auth/invite (admin uniquement)
-$status = $this->auth->auth()->inviteUser('invitee@example.com'); // ['status' => 'INVITE_SENT', ...]
-// Si le compte est déjà actif, une ApiErrorException est levée avec le code EMAIL_ALREADY_USED.
-
-// POST /api/auth/invite/complete
-$result = $this->auth->auth()->completeInvite('invitation-token', 'Secret123!');
-// $result contient le payload utilisateur (similaire à l’inscription)
-```
+- `headers`: headers appliqués à toutes les requêtes (surchargés par appel)
+- `timeout_ms`: timeout en millisecondes
